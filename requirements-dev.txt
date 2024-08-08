@@ -25,6 +25,7 @@ decorator==5.1.1
 deprecated==1.2.14
     # via
     #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-semantic-conventions
 django==5.0.7
     # via
@@ -40,8 +41,12 @@ djangorestframework==3.15.2
     # via django_otel_poc (pyproject.toml)
 executing==2.0.1
     # via stack-data
+googleapis-common-protos==1.63.2
+    # via opentelemetry-exporter-otlp-proto-grpc
 granian==1.5.2
     # via django_otel_poc (pyproject.toml)
+grpcio==1.65.4
+    # via opentelemetry-exporter-otlp-proto-grpc
 importlib-metadata==8.0.0
     # via opentelemetry-api
 ipdb==0.13.13
@@ -58,11 +63,16 @@ mypy-extensions==1.0.0
     # via mypy
 opentelemetry-api==1.26.0
     # via
+    #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-django
     #   opentelemetry-instrumentation-wsgi
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
+opentelemetry-exporter-otlp-proto-common==1.26.0
+    # via opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-exporter-otlp-proto-grpc==1.26.0
+    # via django_otel_poc (pyproject.toml)
 opentelemetry-instrumentation==0.47b0
     # via
     #   opentelemetry-instrumentation-django
@@ -71,8 +81,14 @@ opentelemetry-instrumentation-django==0.47b0
     # via django_otel_poc (pyproject.toml)
 opentelemetry-instrumentation-wsgi==0.47b0
     # via opentelemetry-instrumentation-django
+opentelemetry-proto==1.26.0
+    # via
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-grpc
 opentelemetry-sdk==1.26.0
-    # via django_otel_poc (pyproject.toml)
+    # via
+    #   django_otel_poc (pyproject.toml)
+    #   opentelemetry-exporter-otlp-proto-grpc
 opentelemetry-semantic-conventions==0.47b0
     # via
     #   opentelemetry-instrumentation-django
@@ -94,6 +110,10 @@ pip-tools==7.4.1
     # via django_otel_poc (pyproject.toml)
 prompt-toolkit==3.0.47
     # via ipython
+protobuf==4.25.4
+    # via
+    #   googleapis-common-protos
+    #   opentelemetry-proto
 psycopg2-binary==2.9.9
     # via django_otel_poc (pyproject.toml)
 ptyprocess==0.7.0
