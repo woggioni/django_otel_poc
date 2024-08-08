@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=65.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "django_otel_poc"
+version = "0.0.1"
+authors = [
+  { name="Walter Oggioni", email="walter.oggioni@accenture.com" },
+]
+description = "Django OTEL poc"
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    'django',
+    'Pillow',
+    'psycopg2-binary',
+    'djangorestframework',
+    'opentelemetry-sdk',
+    'opentelemetry-instrumentation-django',
+    'opentelemetry-exporter-otlp-proto-grpc',
+    'python-json-logger'
+]
+
+[project.optional-dependencies]
+dev = [
+    "build", "pip-tools", "mypy", "ipdb", "django-stubs", "granian"
+]
+
+#[tool.setuptools.package-data]
+#admin = ['static/admin']
+#rest_framework = ['static/rest_framework']
+
+[tool.setuptools.package-dir]
+django_otel_poc = "django_otel_poc"
+hcms = "hcms"
+
+[project.scripts]
+"manage.py" = "django_otel_poc:django_manage"

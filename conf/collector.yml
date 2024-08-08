@@ -1,0 +1,37 @@
+
+
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: '0.0.0.0:4317'
+    hostmetrics:
+      collection_interval: 1m
+      scrapers:
+        load:
+        memory:
+
+  processors:
+    batch: null
+
+  exporters:
+    elastic:
+      apm_server_url: 'http://elasticsearch:9200'
+#      secret_token: 'APM_SERVER_SECRET_TOKEN'
+
+  service:
+    pipelines:
+      metrics:
+        receivers:
+          - otlp
+          - hostmetrics
+        exporters:
+          - elastic
+      traces:
+        receivers:
+          - otlp
+        processors:
+          - batch
+        exporters:
+          - elastic
+

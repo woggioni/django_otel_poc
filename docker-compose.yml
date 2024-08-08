@@ -1,0 +1,105 @@
+networks:
+  django-otel-poc:
+    external: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.128.0.0/16
+          ip_range: 172.128.0.0/16
+          gateway: 172.128.0.254
+
+volumes:
+  data:
+    driver: local
+
+services:
+  django:
+    build:
+      context: .
+    container_name: django
+    restart: unless-stopped
+    environment:
+      - GRANIAN_HOST=0.0.0.0
+      - GRANIAN_PORT=8080
+      - GRANIAN_INTERFACE=asginl
+      - GRANIAN_HTTP=1
+#      - GRANIAN_LOOP=asyncio
+#      - GRANIAN_LOOP_OPT=True
+      - DJANGO_SETTINGS_MODULE=django_otel_poc.settings
+      - OTEL_EXPORTER_OTLP_TRACES_INSECURE=True
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://opentelemetry-collector:4317
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://opentelemetry-collector:4317
+    networks:
+      - django-otel-poc
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "[::1]:8080:8080"
+    depends_on:
+      - postgres
+      - elasticsearch
+      - kibana
+    deploy:
+        resources:
+            limits:
+              cpus: "1.00"
+              memory: 256M
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+        - discovery.type=single-node
+        - xpack.security.enabled=false
+        - xpack.security.enrollment.enabled=false
+        - xpack.security.http.ssl.enabled=false
+        - xpack.security.transport.ssl.enabled=false
+        - cluster.routing.allocation.disk.threshold_enabled=false
+    networks:
+      - django-otel-poc
+    volumes:
+      - data:/var/lib/postgresql/data
+    deploy:
+        resources:
+            limits:
+              cpus: "1.00"
+              memory: 1G
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.2
+    container_name: kibana
+    restart: unless-stopped
+    networks:
+      - django-otel-poc
+    ports:
+      - "127.0.0.1:5601:5601"
+    volumes:
+      - ./conf/kibana.yaml:/usr/share/kibana/config/kibana.yaml:ro
+    deploy:
+        resources:
+            limits:
+              cpus: "1.00"
+              memory: 1G
+    depends_on:
+      - elasticsearch
+  postgres:
+    image: postgres:alpine
+    container_name: postgres
+    restart: unless-stopped
+    networks:
+      - django-otel-poc
+    volumes:
+      - data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=password
+  opentelemetry-collector:
+    image: otel/opentelemetry-collector-contrib
+    container_name: opentelementry-collector
+  curl:
+    image: alpine/curl
+    depends_on:
+      - kibana
+    command: ["--upload-file", "/log4j.ndjson", "--retry", "5", "http://kibana:5601/api/saved_objects/_import?overwrite=true"]
+    restart: on-failure:5
+    networks:
+      - django-otel-poc
+    volumes:
+      - ./conf/log4j.ndjson:/log4j.ndjson:ro
