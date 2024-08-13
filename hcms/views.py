@@ -1,10 +1,12 @@
-from django.shortcuts import render
+from logging import getLogger
+
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from logging import getLogger
+
 from .models import Appointment, Patient, Doctor
 from .serializers import DoctorSerializer, AppointmentSerializer, PatientSerializer
+
 
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
@@ -23,6 +25,7 @@ class AppointmentMarkAsCompleted(generics.UpdateAPIView):
     serializer_class = AppointmentSerializer
 
 logger = getLogger(__name__)
+
 @api_view(['POST'])
 def mark_appointment_as_completed(request, pk):
     try:

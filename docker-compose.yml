@@ -27,22 +27,45 @@ services:
 #      - GRANIAN_LOOP_OPT=True
       - DJANGO_SETTINGS_MODULE=django_otel_poc.settings
       - OTEL_EXPORTER_OTLP_TRACES_INSECURE=True
-      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://opentelemetry-collector:4317
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://opentelemetry-collector:4317
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_METRICS_INSECURE=True
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://jaeger:4317
     networks:
       - django-otel-poc
     ports:
       - "127.0.0.1:8080:8080"
       - "[::1]:8080:8080"
+    profiles: [prod]
     depends_on:
       - postgres
       - elasticsearch
       - kibana
+      - jaeger
     deploy:
         resources:
             limits:
               cpus: "1.00"
               memory: 256M
+  apm:
+    image: docker.elastic.co/apm/apm-server:8.12.2
+    container_name: apm
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    command: ['--strict.perms=false']
+    networks:
+      - django-otel-poc
+    ports:
+      - "127.0.0.1:8200:8200"
+    volumes:
+      - ./conf/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
+    depends_on:
+      - elasticsearch
+    deploy:
+        resources:
+            limits:
+              cpus: "1.00"
+              memory: 1G
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
     container_name: elasticsearch
@@ -56,6 +79,8 @@ services:
         - cluster.routing.allocation.disk.threshold_enabled=false
     networks:
       - django-otel-poc
+    ports:
+      - "127.0.0.1:9200:9200"
     volumes:
       - data:/var/lib/postgresql/data
     deploy:
@@ -72,7 +97,7 @@ services:
     ports:
       - "127.0.0.1:5601:5601"
     volumes:
-      - ./conf/kibana.yaml:/usr/share/kibana/config/kibana.yaml:ro
+      - ./conf/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
     deploy:
         resources:
             limits:
@@ -80,6 +105,17 @@ services:
               memory: 1G
     depends_on:
       - elasticsearch
+  jaeger:
+    container_name: jaeger
+    restart: unless-stopped
+    networks:
+      - django-otel-poc
+    image: jaegertracing/all-in-one:latest
+    environment:
+      -  COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    ports:
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4317:4317"
   postgres:
     image: postgres:alpine
     container_name: postgres
@@ -90,16 +126,16 @@ services:
       - data:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=password
-  opentelemetry-collector:
-    image: otel/opentelemetry-collector-contrib
-    container_name: opentelementry-collector
-  curl:
-    image: alpine/curl
-    depends_on:
-      - kibana
-    command: ["--upload-file", "/log4j.ndjson", "--retry", "5", "http://kibana:5601/api/saved_objects/_import?overwrite=true"]
-    restart: on-failure:5
-    networks:
-      - django-otel-poc
-    volumes:
-      - ./conf/log4j.ndjson:/log4j.ndjson:ro
+#  opentelemetry-collector:
+#    image: otel/opentelemetry-collector-contrib
+#    container_name: opentelementry-collector
+#  curl:
+#    image: alpine/curl
+#    depends_on:
+#      - kibana
+#    command: ["--upload-file", "/log4j.ndjson", "--retry", "5", "http://kibana:5601/api/saved_objects/_import?overwrite=true"]
+#    restart: on-failure:5
+#    networks:
+#      - django-otel-poc
+#    volumes:
+#      - ./conf/log4j.ndjson:/log4j.ndjson:ro

@@ -70,6 +70,8 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = 'django_otel_poc.asgi.application'
+
 WSGI_APPLICATION = 'django_otel_poc.wsgi.application'
 
 
@@ -132,16 +134,42 @@ STATIC_ROOT = root_from_env and Path(root_from_env) or (BASE_DIR / 'static')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
+def configure_logging(handler_names, elasticsearch_host):
+    return {
+        "version": 1,
+        "disable_existing_loggers": True,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "level": "INFO"
+            },
+            "http": {
+                "class": "django_otel_poc.async_log.BufferingHTTPHandler",
+                "host": elasticsearch_host,
+                "index": 'filebeat-django_otel_poc',
+            },
+            "async": {
+                "class": "logging.handlers.QueueHandler",
+                "queue": "django_otel_poc.async_log.queue_factory",
+                "listener": "django_otel_poc.async_log.AutoStartingQueueListener",
+                "handlers": ["http"]
+            }
         },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "INFO",
-    },
-}
+        "root": {
+            "handlers": handler_names,
+            "level": "INFO",
+        },
+        "loggers": {
+            "django": {
+                "handlers": handler_names,
+                "level": "INFO",
+            },
+            "django.server": {
+                "handlers": handler_names,
+                "level": "INFO",
+                "propagate": False,
+            },
+        },
+    }
+
+LOGGING = configure_logging(['async', 'console'], 'elasticsearch:9200')

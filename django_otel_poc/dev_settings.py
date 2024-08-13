@@ -1,5 +1,7 @@
 from .settings import *
 
+from .settings import configure_logging
+
 DEBUG = True
 
 DATABASES = {
@@ -9,16 +11,7 @@ DATABASES = {
     }
 }
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "INFO",
-    },
-}
+
+LOGGING = configure_logging(['async', 'console'], '127.0.0.1:9200')
+
+

@@ -21,6 +21,7 @@ dependencies = [
     'psycopg2-binary',
     'djangorestframework',
     'opentelemetry-sdk',
+    'opentelemetry-instrumentation-asgi',
     'opentelemetry-instrumentation-django',
     'opentelemetry-exporter-otlp-proto-grpc',
     'python-json-logger'
