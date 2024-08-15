@@ -1,0 +1,87 @@
+@startuml
+skinparam componentStyle rectangle
+
+frame "Python microservice 1" as ms1 {
+  [OpenTelementry SDK] as otel1
+  [Django] as django1
+}
+
+frame "Python microservice 2" as ms2 {
+  [OpenTelementry SDK] as otel2
+  [Django] as django2
+}
+
+frame "Python microservice 3" as ms3 {
+  [OpenTelementry SDK] as otel3
+  [Django] as django3
+}
+
+database "Postgres" as db {
+}
+
+database "Elasticsearch" as es_observability {
+}
+[Kibana] as kibana
+[Prometheus] as prometheus
+[Grafana] as grafana
+[Jaeger] as jaeger
+[APM Server] as apm
+[OpenTelementry collector] as collector
+[Kafka] as kafka
+
+database "Elasticsearch used\nby the application" as es_app {
+}
+
+database "Redis" as redis {
+}
+
+
+otel1 --> prometheus #blue
+otel2 --> prometheus #blue
+otel3 --> prometheus #blue
+
+prometheus --> grafana #blue
+
+otel1 --> jaeger #red
+otel2 --> jaeger #red
+otel3 --> jaeger #red
+
+otel1 --> apm #green
+otel2 --> apm #green
+otel3 --> apm #green
+
+django1 .. db 
+django2 .. db
+django3 .. db
+
+kibana <-- es_observability #green
+
+django1 .. es_app
+django2 .. es_app
+django3 .. es_app
+
+django1 .. redis
+django2 .. redis
+django3 .. redis
+
+django1 .. kafka
+django2 .. kafka
+django3 .. kafka
+
+es_app --> collector #blue
+
+kafka --> collector #red
+kafka --> collector #blue
+kafka --> collector #green
+
+redis --> collector #blue
+
+db --> collector #blue
+
+collector --> jaeger #red
+collector --> prometheus #blue
+collector --> apm #green
+
+apm --> es_observability #green
+
+@enduml

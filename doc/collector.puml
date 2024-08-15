@@ -1,0 +1,62 @@
+@startuml
+skinparam componentStyle rectangle
+
+frame "Python microservice" as ms {
+  [OpenTelementry SDK] as otel
+  [Django] as django
+}
+
+database "Postgres" as db {
+}
+
+database "Elasticsearch" as es_observability {
+}
+
+frame "OpenTelementry collector" as collector {
+ [Elastic Exporter] as eexporter
+}
+
+[Kibana] as kibana
+[Kafka] as kafka
+
+database "Elasticsearch used\nby the application" as es_app {
+}
+
+database "Redis" as redis {
+}
+
+otel --> collector #red
+otel --> collector #blue
+otel --> collector #green
+
+django .. db 
+django .. kafka
+
+eexporter --> es_observability #red
+eexporter --> es_observability #green
+eexporter --> es_observability #blue
+
+kibana <-- es_observability #red
+kibana <-- es_observability #green
+kibana <-- es_observability #blue
+
+django .. es_app
+django .. redis
+
+kafka --> collector #red
+kafka --> collector #green
+kafka --> collector #blue
+
+es_app --> collector #red
+es_app --> collector #blue
+es_app --> collector #green
+
+redis --> collector #red
+redis --> collector #blue
+redis --> collector #green
+
+db --> collector #red
+db --> collector #blue
+db --> collector #green
+
+@enduml
