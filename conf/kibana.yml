@@ -1,4 +1,10 @@
 server.host: "0.0.0.0"
 server.shutdownTimeout: "5s"
-monitoring.ui.container.elasticsearch.enabled: true
+#monitoring.ui.container.elasticsearch.enabled: true
 elasticsearch.hosts: ["http://elasticsearch:9200"]
+# elasticsearch.username: "elastic"
+# elasticsearch.password: "password"
+#elasticsearch.serviceAccountToken: AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYTpsTTc4MVRzOVRqV1Vja3pRNGYzRHJn
+xpack.fleet.packages:
+- name: apm
+  version: latest

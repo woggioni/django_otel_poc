@@ -11,7 +11,5 @@ DATABASES = {
     }
 }
 
-
-LOGGING = configure_logging(['async', 'console'], '127.0.0.1:9200')
-
+LOGGING = configure_logging(['console'], '127.0.0.1:9200')
 

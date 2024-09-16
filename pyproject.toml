@@ -23,8 +23,10 @@ dependencies = [
     'opentelemetry-sdk',
     'opentelemetry-instrumentation-asgi',
     'opentelemetry-instrumentation-django',
-    'opentelemetry-exporter-otlp-proto-grpc',
-    'python-json-logger'
+    'opentelemetry-exporter-otlp',
+    'opentelemetry-instrumentation-logging',
+    'python-json-logger',
+    'opentelemetry-instrumentation-system-metrics',
 ]
 
 [project.optional-dependencies]

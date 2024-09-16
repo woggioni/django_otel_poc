@@ -28,7 +28,6 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -39,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'hcms.apps.HcmsConfig'
+    'hcms.apps.HcmsConfig',
 ]
 
 MIDDLEWARE = [
@@ -141,7 +140,8 @@ def configure_logging(handler_names, elasticsearch_host):
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
-                "level": "INFO"
+                "level": "INFO",
+                "formatter": "default"
             },
             "http": {
                 "class": "django_otel_poc.async_log.BufferingHTTPHandler",
@@ -170,6 +170,12 @@ def configure_logging(handler_names, elasticsearch_host):
                 "propagate": False,
             },
         },
+        "formatters" : {
+            "default": {
+                "format": "{asctime} [{levelname}] ({processName:s}/{threadName:s}) - {name} - {message}",
+                'style': '{',
+            }
+        }
     }
 
-LOGGING = configure_logging(['async', 'console'], 'elasticsearch:9200')
+LOGGING = configure_logging(['console'], 'elasticsearch:9200')

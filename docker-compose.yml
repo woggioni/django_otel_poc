@@ -1,5 +1,5 @@
 networks:
-  django-otel-poc:
+  default:
     external: false
     ipam:
       driver: default
@@ -9,10 +9,96 @@ networks:
           gateway: 172.128.0.254
 
 volumes:
-  data:
+  postgres-data:
     driver: local
-
+  elasticsearch-data:
+    driver: local
+  elk-certs:
+    driver: local
+  kibana-data:
+    driver: local
 services:
+  setup-certificates:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    volumes:
+      - elk-certs:/usr/share/elasticsearch/config/certs
+    user: "0"
+    command: >
+      bash -c '
+        set -e
+        if [ ! -f config/certs/ca.zip ]; then
+          echo "Creating CA";
+          bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
+          unzip config/certs/ca.zip -d config/certs;
+        fi;
+        if [ ! -f config/certs/certs.zip ]; then
+          echo "Creating certs";
+          echo -ne \
+          "instances:\n"\
+          "  - name: elasticsearch\n"\
+          "    dns:\n"\
+          "      - elasticsearch\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          > config/certs/instances.yml;
+          bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
+          unzip config/certs/certs.zip -d config/certs;
+          echo "Setting file permissions"
+          chown -R root:root config/certs;
+          find . -type d -exec chmod 555 \{\} \;;
+          find . -type f -exec chmod 555 \{\} \;;
+        fi;
+      '
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f config/certs/es/es.crt ]"]
+      interval: 1s
+      timeout: 5s
+      retries: 120
+  setup-password:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    volumes:
+      - elk-certs:/usr/share/elasticsearch/config/certs
+    user: "0"
+    command: >
+      bash -c '
+        set -e
+        if [ x${ELASTIC_PASSWORD} == x ]; then
+          echo "Set the ELASTIC_PASSWORD environment variable in the .env file";
+          exit 1;
+        elif [ x${KIBANA_PASSWORD} == x ]; then
+          echo "Set the KIBANA_PASSWORD environment variable in the .env file";
+          exit 1;
+        fi;
+        echo "Waiting for Elasticsearch availability";
+        until curl -s --cacert config/certs/ca/ca.crt https://elasticsearch:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
+        echo "Setting kibana_system password";
+        curl -s --retry 5 -X POST --cacert config/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" https://elasticsearch:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}"
+        echo "Create apm_writer role";
+        curl -v --retry 5 -X POST --cacert config/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" https://elasticsearch:9200/_security/role/apm_writer -d "
+          {
+            \"description\": \"Grants permisssion to push observability data (traces, metrics, logs) and create the related indexes.\",
+            \"cluster\": [\"all\"],
+            \"indices\":[
+              {
+                \"names\": [ \"traces-apm*\", \"apm-*\", \"logs-apm*\", \"apm-*\", \"metrics-apm*\", \"apm-*\"],
+                \"privileges\": [ \"auto_configure\", \"create_doc\" ]
+              }
+            ]
+          }
+        "
+        echo "Create apm_writer user";
+        curl -v --retry 5 -X POST --cacert config/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" https://elasticsearch:9200/_security/user/apm_writer -d "
+          {
+            \"roles\" : [ \"apm_writer\" ],
+            \"password\": \"${APM_PASSWORD}\"
+          }
+        "
+        echo "All done!";
+      '
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
   django:
     build:
       context: .
@@ -23,96 +109,158 @@ services:
       - GRANIAN_PORT=8080
       - GRANIAN_INTERFACE=asginl
       - GRANIAN_HTTP=1
-#      - GRANIAN_LOOP=asyncio
-#      - GRANIAN_LOOP_OPT=True
+      #      - GRANIAN_LOOP=asyncio
+      #      - GRANIAN_LOOP_OPT=True
       - DJANGO_SETTINGS_MODULE=django_otel_poc.settings
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://apm:8200
       - OTEL_EXPORTER_OTLP_TRACES_INSECURE=True
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://jaeger:4317
+#      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://apm:8200
       - OTEL_EXPORTER_OTLP_METRICS_INSECURE=True
-      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://jaeger:4317
-    networks:
-      - django-otel-poc
+#      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://apm:8200
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=django,service.version=0.0.1,deployment.environment=production
     ports:
       - "127.0.0.1:8080:8080"
       - "[::1]:8080:8080"
     profiles: [prod]
     depends_on:
-      - postgres
-      - elasticsearch
-      - kibana
-      - jaeger
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
     deploy:
-        resources:
-            limits:
-              cpus: "1.00"
-              memory: 256M
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 256M
   apm:
-    image: docker.elastic.co/apm/apm-server:8.12.2
+    image: docker.elastic.co/apm/apm-server:${STACK_VERSION}
     container_name: apm
     restart: unless-stopped
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    command: ['--strict.perms=false']
-    networks:
-      - django-otel-poc
+      - ELASTICSEARCH_USERNAME=apm_writer
+      - ELASTICSEARCH_PASSWORD=${APM_PASSWORD}
+      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+    command: ["--strict.perms=false"]
     ports:
       - "127.0.0.1:8200:8200"
     volumes:
       - ./conf/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
-    depends_on:
-      - elasticsearch
+      - elk-certs:/etc/pki/tls/certs:ro
     deploy:
-        resources:
-            limits:
-              cpus: "1.00"
-              memory: 1G
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    build:
+      context: elasticsearch
+      args:
+        STACK_VERSION: ${STACK_VERSION}
+        PASSWORD: password
     container_name: elasticsearch
     restart: unless-stopped
     environment:
-        - discovery.type=single-node
-        - xpack.security.enabled=false
-        - xpack.security.enrollment.enabled=false
-        - xpack.security.http.ssl.enabled=false
-        - xpack.security.transport.ssl.enabled=false
-        - cluster.routing.allocation.disk.threshold_enabled=false
-    networks:
-      - django-otel-poc
+      - node.name=elasticsearch
+      - bootstrap.memory_lock=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/elasticsearch/elasticsearch.key
+      - xpack.security.http.ssl.certificate=certs/elasticsearch/elasticsearch.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/elasticsearch/elasticsearch.key
+      - xpack.security.transport.ssl.certificate=certs/elasticsearch/elasticsearch.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.license.self_generated.type=${LICENSE}
+      - xpack.apm_data.enabled=true
+    volumes:
+      # - ./confservice_tokens.yml:/usr/share/ealsticsearch/config/service_tokens:ro
+      - elk-certs:/usr/share/elasticsearch/config/certs:ro
+      - elasticsearch-data:/usr/share/elasticsearch/data
     ports:
       - "127.0.0.1:9200:9200"
-    volumes:
-      - data:/var/lib/postgresql/data
     deploy:
-        resources:
-            limits:
-              cpus: "1.00"
-              memory: 1G
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    depends_on:
+      setup-certificates:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.12.2
+    # build:
+    #   context: kibana
+    #   args:
+    #     STACK_VERSION: ${STACK_VERSION}
+    #     PASSWORD: password
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
     container_name: kibana
     restart: unless-stopped
-    networks:
-      - django-otel-poc
     ports:
       - "127.0.0.1:5601:5601"
     volumes:
       - ./conf/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - elk-certs:/usr/share/kibana/config/certs:ro
+      - kibana-data:/usr/share/kibana/data
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
     deploy:
-        resources:
-            limits:
-              cpus: "1.00"
-              memory: 1G
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
     depends_on:
-      - elasticsearch
+      setup-certificates:
+        condition: service_completed_successfully
+      setup-password:
+        condition: service_completed_successfully
+      elasticsearch:
+        condition: service_healthy
   jaeger:
     container_name: jaeger
     restart: unless-stopped
-    networks:
-      - django-otel-poc
     image: jaegertracing/all-in-one:latest
     environment:
-      -  COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
     ports:
       - "127.0.0.1:16686:16686"
       - "127.0.0.1:4317:4317"
@@ -120,12 +268,16 @@ services:
     image: postgres:alpine
     container_name: postgres
     restart: unless-stopped
-    networks:
-      - django-otel-poc
     volumes:
-      - data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 5s
 #  opentelemetry-collector:
 #    image: otel/opentelemetry-collector-contrib
 #    container_name: opentelementry-collector
@@ -135,7 +287,5 @@ services:
 #      - kibana
 #    command: ["--upload-file", "/log4j.ndjson", "--retry", "5", "http://kibana:5601/api/saved_objects/_import?overwrite=true"]
 #    restart: on-failure:5
-#    networks:
-#      - django-otel-poc
 #    volumes:
 #      - ./conf/log4j.ndjson:/log4j.ndjson:ro
