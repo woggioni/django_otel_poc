@@ -22,6 +22,7 @@ from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrument
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
 from opentelemetry.instrumentation.django import DjangoInstrumentor
+from  opentelemetry.instrumentation.logging import LoggingInstrumentor
 import os
 from logging import getLogger
 import logging
@@ -55,7 +56,7 @@ def setup():
     logger_provider = LoggerProvider(resource=resource)
     logger_provider.add_log_record_processor(BatchLogRecordProcessor(log_exporter))
     _logs.set_logger_provider(logger_provider)
-    handler = LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
+    # handler = LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
 
     tracer_provider: TracerProvider = TracerProvider(
         resource=resource
@@ -78,3 +79,4 @@ def setup():
     #     "process.runtime.context_switches": ["involuntary", "voluntary"],
     # }
     SystemMetricsInstrumentor().instrument()
+    # LoggingInstrumentor(log_level=logging.DEBUG).instrument()

@@ -33,6 +33,9 @@ dependencies = [
 dev = [
     "build", "pip-tools", "mypy", "ipdb", "django-stubs", "granian"
 ]
+runtime = [
+    "granian"
+]
 
 #[tool.setuptools.package-data]
 #admin = ['static/admin']

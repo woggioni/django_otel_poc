@@ -153,6 +153,9 @@ def configure_logging(handler_names, elasticsearch_host):
                 "queue": "django_otel_poc.async_log.queue_factory",
                 "listener": "django_otel_poc.async_log.AutoStartingQueueListener",
                 "handlers": ["http"]
+            },
+            "otel": {
+                "class": "opentelemetry.sdk._logs._internal.LoggingHandler"
             }
         },
         "root": {
@@ -178,4 +181,4 @@ def configure_logging(handler_names, elasticsearch_host):
         }
     }
 
-LOGGING = configure_logging(['console'], 'elasticsearch:9200')
+LOGGING = configure_logging(['console', 'otel'], 'elasticsearch:9200')
