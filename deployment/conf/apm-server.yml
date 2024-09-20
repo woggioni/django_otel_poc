@@ -332,12 +332,12 @@ output.elasticsearch:
   #compression_level: 0
 
   # Protocol - either `http` (default) or `https`.
-  protocol: "https"
+  # protocol: "https"
 
   # Authentication credentials - either API key or username/password.
   #api_key: "id:api_key"
-  username: ${ELASTICSEARCH_USERNAME:apm_writer}
-  password: ${ELASTICSEARCH_PASSWORD:password}
+  # username: ${ELASTICSEARCH_USERNAME:apm_writer}
+  # password: ${ELASTICSEARCH_PASSWORD:password}
 
   # Optional HTTP Path.
   #path: "/elasticsearch"
@@ -377,7 +377,7 @@ output.elasticsearch:
   #flush_interval: 1s
 
   # Enable custom SSL settings. Set to false to ignore custom SSL settings for secure communication.
-  ssl.enabled: true
+  ssl.enabled: false
 
   # Optional SSL configuration options. SSL is off by default, change the `protocol` option if you want to enable `https`.
   #
@@ -403,7 +403,7 @@ output.elasticsearch:
   #ssl.supported_protocols: [TLSv1.0, TLSv1.1, TLSv1.2]
 
   # List of root certificates for HTTPS server verifications.
-  ssl.certificate_authorities: ["/etc/pki/tls/certs/ca/ca.crt"]
+  # ssl.certificate_authorities: ["/etc/pki/tls/certs/ca/ca.crt"]
   # Certificate for SSL client authentication.
   #ssl.certificate: "/etc/pki/client/cert.pem"
 
