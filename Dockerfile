@@ -1,4 +1,4 @@
-FROM alpine:latest AS base
+FROM alpine:3.22 AS base
 
 RUN --mount=type=cache,target=/var/cache/apk apk update
 RUN --mount=type=cache,target=/var/cache/apk apk add python3 gcc python3-dev musl-dev linux-headers

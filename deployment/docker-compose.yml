@@ -4,8 +4,8 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 172.128.0.0/16
-          ip_range: 172.128.0.0/16
+        - subnet: 172.128.0.0/24
+          ip_range: 172.128.0.0/24
           gateway: 172.128.0.254
 
 volumes:
@@ -42,7 +42,6 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
       - "[::1]:8080:8080"
-    profiles: [prod]
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,7 +96,7 @@ services:
       resources:
         limits:
           cpus: "1.00"
-          memory: 1G
+          memory: 2G
     ulimits:
       memlock:
         soft: -1
@@ -113,10 +112,6 @@ services:
       retries: 120
 
   kibana:
-    # build:
-    #   context: kibana
-    #   args:
-    #     STACK_VERSION: ${STACK_VERSION}
     image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
     container_name: kibana
     restart: unless-stopped
@@ -146,7 +141,7 @@ services:
       elasticsearch:
         condition: service_healthy
   postgres:
-    image: postgres:alpine
+    image: postgres:${POSTGRES_VERSION}-alpine
     container_name: postgres
     restart: unless-stopped
     volumes:
@@ -159,7 +154,5 @@ services:
       timeout: 60s
       retries: 5
       start_period: 5s
-#  opentelemetry-collector:
-#    image: otel/opentelemetry-collector-contrib
-#    container_name: opentelementry-collector
+
 

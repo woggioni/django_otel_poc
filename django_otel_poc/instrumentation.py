@@ -6,7 +6,8 @@ from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader, ConsoleMetricExporter
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.resources import ResourceAttributes
+from opentelemetry.semconv.attributes.service_attributes import SERVICE_NAME
+from opentelemetry.semconv._incubating.attributes.service_attributes import SERVICE_INSTANCE_ID
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
@@ -22,16 +23,15 @@ from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrument
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
 from opentelemetry.instrumentation.django import DjangoInstrumentor
-from  opentelemetry.instrumentation.logging import LoggingInstrumentor
+# from opentelemetry.instrumentation.logging import LoggingInstrumentor
+from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 import os
-from logging import getLogger
-import logging
 
 def setup():
     resource = Resource(
         attributes={
-            ResourceAttributes.SERVICE_NAME: 'hcms',
-            ResourceAttributes.SERVICE_INSTANCE_ID: os.uname().nodename,
+            SERVICE_NAME: 'hcms',
+            SERVICE_INSTANCE_ID: os.uname().nodename,
         }
     )
 
@@ -80,3 +80,4 @@ def setup():
     # }
     SystemMetricsInstrumentor().instrument()
     # LoggingInstrumentor(log_level=logging.DEBUG).instrument()
+    Psycopg2Instrumentor().instrument()
